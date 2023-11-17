@@ -1,0 +1,16 @@
+prices_start_date = '2022-11-01'
+prices_end_date= '2023-11-01'
+
+def percentage_returns(df):
+    
+    prices = pd.DataFrame()
+    
+    for ind in df.index:
+        stock = yf.Ticker(str(df.iloc[ind, 0]))
+        prices[str(df.iloc[ind, 0])] = fix_timezone(stock.history(start=prices_start_date, end=prices_end_date).Close.pct_change())
+    
+    #Drop rows with missing data
+    prices = prices.dropna()
+    return prices
+
+percentage_returns(df)
