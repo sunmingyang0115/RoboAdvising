@@ -1,0 +1,8 @@
+# Globally defined variable, to be used in multiple functions
+closing_date = '2023-11-20'
+exchange_rate = yf.Ticker('CADUSD=x').history().loc[closing_date, 'Close']
+
+#Function to convert stock price from USD to CAD
+def USD_to_CAD_converter(usd_price):
+    cad_price = usd_price/exchange_rate
+    return cad_price
