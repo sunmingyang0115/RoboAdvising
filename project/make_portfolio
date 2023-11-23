@@ -1,0 +1,58 @@
+#example dataframe for function
+beta = {'Ticker': ['AAPL', 'SHOP.TO', 'VGZ'],
+         'Beta': [1.4, 1.35, 1.80],
+        'Weight': [0.3, 0.6, 0.1]
+}
+betas = pd.DataFrame(beta)
+
+
+#Function to produce dataframe portfolio
+
+def make_portfolio(dataframe):
+    #Define Variables
+    money = 750000
+    flat_fee = 4.95
+    i = 0
+    
+    # Create Empty DataFrame and lists
+    Portfolio_Final = pd.DataFrame()
+    ticker_lst = [0]*len(dataframe)
+    price_lst = [0]*len(dataframe)
+    currency_lst = [0]*len(dataframe)
+    num_shares_lst = [0]*len(dataframe)
+    value_lst = [0]*len(dataframe)
+    weight_lst = [0]*len(dataframe)
+    
+    # Subtract flat fee of purchasing stocks from total investment funds
+    money -= flat_fee*len(dataframe)
+    
+    # Create lists to store data for each ticker
+    while i < len(dataframe):
+        ticker_lst[i] = dataframe.Ticker[i]
+        currency_lst[i] = yf.Ticker(dataframe.Ticker[i]).fast_info['currency']      
+        # If stock currency is in USD, convert price to CAD
+        if currency_lst[i]=='USD':
+            price_lst[i] = USD_to_CAD_converter(yf.Ticker(dataframe.Ticker[i]).history().loc[closing_date, 'Close'])
+        else:
+            price_lst[i] = yf.Ticker(dataframe.Ticker[i]).history().loc[closing_date, 'Close']
+        num_shares_lst[i] = (money*dataframe.Weight[i])/price_lst[i]
+        value_lst[i] = num_shares_lst[i]*price_lst[i]
+        weight_lst[i] = dataframe.Weight[i]
+        i += 1
+    
+    # Create DataFrame with required stock information
+    Portfolio_Final['Ticker'] = ticker_lst
+    Portfolio_Final['Price'] = price_lst
+    Portfolio_Final['Currency'] = currency_lst
+    Portfolio_Final['Shares'] = num_shares_lst
+    Portfolio_Final['Value'] = value_lst
+    Portfolio_Final['Weight'] = weight_lst
+    Portfolio_Final['Total Weight'] = Portfolio_Final.Weight.sum()
+    Portfolio_Final['Total Value'] = Portfolio_Final.Value.sum() + flat_fee*len(dataframe)
+    
+    #Change index of portfolio
+    
+    return Portfolio_Final
+    
+Portfolio_Final = make_portfolio(betas)
+Portfolio_Final
