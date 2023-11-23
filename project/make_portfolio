@@ -22,6 +22,7 @@ def make_portfolio(dataframe):
     num_shares_lst = [0]*len(dataframe)
     value_lst = [0]*len(dataframe)
     weight_lst = [0]*len(dataframe)
+    index_lst = [0]*len(dataframe)
     
     # Subtract flat fee of purchasing stocks from total investment funds
     money -= flat_fee*len(dataframe)
@@ -38,6 +39,7 @@ def make_portfolio(dataframe):
         num_shares_lst[i] = (money*dataframe.Weight[i])/price_lst[i]
         value_lst[i] = num_shares_lst[i]*price_lst[i]
         weight_lst[i] = dataframe.Weight[i]
+        index_lst[i] = i+1
         i += 1
     
     # Create DataFrame with required stock information
@@ -51,6 +53,7 @@ def make_portfolio(dataframe):
     Portfolio_Final['Total Value'] = Portfolio_Final.Value.sum() + flat_fee*len(dataframe)
     
     #Change index of portfolio
+    Portfolio_Final.set_index(pd.Series(index_lst), inplace = True)
     
     return Portfolio_Final
     
