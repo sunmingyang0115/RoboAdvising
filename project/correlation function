@@ -1,0 +1,21 @@
+#Function that calculates covariance given two stocks (strings), produces a dataframe with correlation values
+
+def correlation(stock1, stock2):
+    #Create portfolio of monthly returns 
+    start_date = '2021-10-20'
+    end_date = '2023-11-20'
+    stock1_hist = yf.Ticker(stock1).history(start=start_date, end=end_date, interval='1mo')
+    stock2_hist = yf.Ticker(stock2).history(start=start_date, end=end_date, interval='1mo')
+    
+    #Create DataFrame
+    prices = pd.DataFrame(stock1_hist.Close)
+    prices.columns = [stock1]
+    prices[stock2] = stock2_hist.Close
+    returns = prices.pct_change()
+    #Drop NaN values
+    returns.drop(index=returns.index[0], inplace=True)
+    
+    #Calculate correlation between two stocks   
+    return returns.corr()
+    
+correlation('AAPL', 'SHOP')
