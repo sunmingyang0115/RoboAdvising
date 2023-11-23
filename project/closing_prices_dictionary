@@ -1,0 +1,14 @@
+#Function that consumes list of tickers and produces a dictionary, where key is the ticker, value is a dataframe of closing prices
+
+def closing_prices(lst_tickers):
+    start_date = '2021-10-20'
+    end_date = '2023-11-20'
+    i = 0
+    prices_dict={}
+    
+    while i < len(lst_tickers):
+        prices_data = pd.DataFrame(yf.Ticker(lst_tickers[i]).history(start=start_date, end=end_date, interval='1mo').Close)
+        prices_dict[lst_tickers[i]] = prices_data
+        i += 1
+    
+    return prices_dict
