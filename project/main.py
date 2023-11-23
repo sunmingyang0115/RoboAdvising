@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 
 #========================
-
+#private-functions
 def csv_ticker_to_pd(csv_file):
     return pd.read_csv(csv_file, header=None)
 
@@ -48,8 +48,9 @@ def filter_volume(monthlies, dailies):
 filtering_start_date = '2023-01-01'
 fltering_end_date = '2023-10-31'
 max_inactive_days = 18
-
-# the function
+#=========================
+# public function
+# returns a list of tickers, inputs csv_file
 def filter_tickers_from_csv(csv_file):
   tickers = read_ticker(csv_ticker_to_pd(csv_file))
 
@@ -59,6 +60,7 @@ def filter_tickers_from_csv(csv_file):
   return monthlies.keys()
 
 #=============================================================================
+#public function
 
 #Function that calculates correlation given two stocks (strings), produces a dataframe with correlation values
 def correlation(stock1, stock2):
@@ -80,6 +82,7 @@ def correlation(stock1, stock2):
     return returns.corr()
     
 #=============================================================================
+# public function
 
 # Globally defined variable, to be used in multiple functions
 closing_date = '2023-11-20'
@@ -93,6 +96,7 @@ def USD_to_CAD_converter(usd_price):
 USD_to_CAD_converter(12)
 
 #=============================================================================
+# public function
 
 #Function to produce dataframe portfolio, consumes a dataframe that stores tickers and their chosen weights
 def make_portfolio(dataframe):
