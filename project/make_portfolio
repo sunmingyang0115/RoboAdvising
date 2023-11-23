@@ -1,13 +1,4 @@
-#example dataframe for function
-beta = {'Ticker': ['AAPL', 'SHOP.TO', 'VGZ'],
-         'Beta': [1.4, 1.35, 1.80],
-        'Weight': [0.3, 0.6, 0.1]
-}
-betas = pd.DataFrame(beta)
-
-
-#Function to produce dataframe portfolio
-
+#Function to produce dataframe portfolio, consumes a dataframe that has tickers as index and stores their chosen weights in a column labelled 'Weight'
 def make_portfolio(dataframe):
     #Define Variables
     money = 750000
@@ -29,16 +20,16 @@ def make_portfolio(dataframe):
     
     # Create lists to store data for each ticker
     while i < len(dataframe):
-        ticker_lst[i] = dataframe.Ticker[i]
-        currency_lst[i] = yf.Ticker(dataframe.Ticker[i]).fast_info['currency']      
+        ticker_lst[i] = dataframe.index[i]
+        currency_lst[i] = yf.Ticker(ticker_lst[i]).fast_info['currency']      
         # If stock currency is in USD, convert price to CAD
         if currency_lst[i]=='USD':
-            price_lst[i] = USD_to_CAD_converter(yf.Ticker(dataframe.Ticker[i]).history().loc[closing_date, 'Close'])
+            price_lst[i] = USD_to_CAD_converter(yf.Ticker(ticker_lst[i]).history().loc[closing_date, 'Close'])
         else:
-            price_lst[i] = yf.Ticker(dataframe.Ticker[i]).history().loc[closing_date, 'Close']
-        num_shares_lst[i] = (money*dataframe.Weight[i])/price_lst[i]
+            price_lst[i] = yf.Ticker(ticker_lst[i]).history().loc[closing_date, 'Close']
+        num_shares_lst[i] = (money*dataframe.loc[ticker_lst[i], 'Weight'])/price_lst[i]
         value_lst[i] = num_shares_lst[i]*price_lst[i]
-        weight_lst[i] = dataframe.Weight[i]
+        weight_lst[i] = dataframe.loc[ticker_lst[i], 'Weight']
         index_lst[i] = i+1
         i += 1
     
@@ -56,6 +47,3 @@ def make_portfolio(dataframe):
     Portfolio_Final.set_index(pd.Series(index_lst), inplace = True)
     
     return Portfolio_Final
-    
-Portfolio_Final = make_portfolio(betas)
-Portfolio_Final
