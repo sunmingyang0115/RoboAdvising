@@ -73,6 +73,15 @@ def filter_volume(monthlies, dailies):
             print('removed',e,'; not enough average volume: ',average)
     return monthlies2
 
+def filter_currency(tickers):
+    tickers2 = {}
+    for e in tickers:
+        if (not ('currency' in tickers[e].info)): continue
+        if (tickers[e].info['currency'] == 'USD' or tickers[e].info['currency'] == 'CAD'):
+            tickers2[e] = tickers[e]
+    return tickers2
+            
+
 filtering_start_date = '2023-01-01'
 fltering_end_date = '2023-10-31'
 max_inactive_days = 18
@@ -82,7 +91,7 @@ max_inactive_days = 18
 def get_valid_tickers(filename):
     ticker_df = csv_ticker_to_pd(filename) # dataframe with one column (tickers)
     tickers_lst = ticker_df[0].tolist() # list of tickers
-    tickers = read_ticker(tickers_lst) # dictionary (ticker str : ticker object)
+    tickers = filter_currency(read_ticker(tickers_lst)) # dictionary (ticker str : ticker object)
     monthlies = filter_invalid(get_vols(tickers,filtering_start_date,fltering_end_date,'1mo'))
     dailies = filter_invalid(get_vols(tickers,filtering_start_date,fltering_end_date,'1d'))
     monthlies = filter_volume(dailies,monthlies) # filter by volumes
@@ -124,10 +133,18 @@ def USD_to_CAD_converter(usd_price):
 
 USD_to_CAD_converter(12)
 
+#==========
+
+def weighter(ticker):
+    df = pd.DataFrame()
+    df['tickers']=ticker
+    df['Weight']=[0.20,0.20,0.20,0.10,0.05,0.05,0.05,0.05,0.05,0.05]
+    return (df.set_index('tickers'))
+
 #=============================================================================
 # public function
 
-#Function to produce dataframe portfolio, consumes a dataframe that stores tickers and their chosen weights
+#Function to produce dataframe portfolio, consumes a dataframe that has tickers as index and stores their chosen weights in a column labelled 'Weight'
 def make_portfolio(dataframe):
     #Define Variables
     money = 750000
@@ -149,16 +166,16 @@ def make_portfolio(dataframe):
     
     # Create lists to store data for each ticker
     while i < len(dataframe):
-        ticker_lst[i] = dataframe.Ticker[i]
-        currency_lst[i] = yf.Ticker(dataframe.Ticker[i]).fast_info['currency']      
+        ticker_lst[i] = dataframe.index[i]
+        currency_lst[i] = yf.Ticker(ticker_lst[i]).fast_info['currency']      
         # If stock currency is in USD, convert price to CAD
         if currency_lst[i]=='USD':
-            price_lst[i] = USD_to_CAD_converter(yf.Ticker(dataframe.Ticker[i]).history().loc[closing_date, 'Close'])
+            price_lst[i] = USD_to_CAD_converter(yf.Ticker(ticker_lst[i]).history().loc[closing_date, 'Close'])
         else:
-            price_lst[i] = yf.Ticker(dataframe.Ticker[i]).history().loc[closing_date, 'Close']
-        num_shares_lst[i] = (money*dataframe.Weight[i])/price_lst[i]
+            price_lst[i] = yf.Ticker(ticker_lst[i]).history().loc[closing_date, 'Close']
+        num_shares_lst[i] = (money*dataframe.loc[ticker_lst[i], 'Weight'])/price_lst[i]
         value_lst[i] = num_shares_lst[i]*price_lst[i]
-        weight_lst[i] = dataframe.Weight[i]
+        weight_lst[i] = dataframe.loc[ticker_lst[i], 'Weight']
         index_lst[i] = i+1
         i += 1
     
@@ -176,8 +193,17 @@ def make_portfolio(dataframe):
     Portfolio_Final.set_index(pd.Series(index_lst), inplace = True)
     
     return Portfolio_Final
+#======
+
+def make_stocks_final(portfolio, filename):
+    Stocks_Final = portfolio
+    Stocks_Final.drop(columns=['Price', 'Currency', 'Value', 'Weight', 'Total Weight', 'Total Value'], inplace=True)
+    
+    return Stocks_Final.to_csv(filename+'.csv')
 
 #===========================
+
+
 
 #Function that consumes list of tickers and produces a dictionary, where key is the ticker, value is a dataframe of closing prices
 
