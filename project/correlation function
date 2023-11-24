@@ -7,10 +7,21 @@ def correlation(stock1, stock2):
     stock1_hist = yf.Ticker(stock1).history(start=start_date, end=end_date, interval='1mo')
     stock2_hist = yf.Ticker(stock2).history(start=start_date, end=end_date, interval='1mo')
     
-    #Create DataFrame
-    prices = pd.DataFrame(stock1_hist.Close)
-    prices.columns = [stock1]
-    prices[stock2] = stock2_hist.Close
+    #If currency of both stocks is not the same, convert to CAD
+    if yf.Ticker(stock1).fast_info['currency'] == 'USD' and yf.Ticker(stock2).fast_info['currency'] == 'CAD':
+        prices = pd.DataFrame(stock1_hist.Close/exchange_rate)
+        prices.columns = [stock1]
+        prices[stock2] = stock2_hist.Close
+    elif yf.Ticker(stock1).fast_info['currency'] == 'CAD' and yf.Ticker(stock2).fast_info['currency'] == 'USD':
+        prices = pd.DataFrame(stock1_hist.Close)
+        prices.columns = [stock1]
+        prices[stock2] = stock2_hist.Close/exchange_rate
+    else:
+        prices = pd.DataFrame(stock1_hist.Close)
+        prices.columns = [stock1]
+        prices[stock2] = stock2_hist.Close
+
+    # Calculate percentage returns
     returns = prices.pct_change()
     #Drop NaN values
     returns.drop(index=returns.index[0], inplace=True)
@@ -18,4 +29,4 @@ def correlation(stock1, stock2):
     #Calculate correlation between two stocks   
     return returns.corr()
     
-correlation('AAPL', 'SHOP')
+correlation('AAPL', 'SHOP.TO')
