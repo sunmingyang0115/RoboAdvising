@@ -10,39 +10,67 @@ from datetime import datetime
 #========================
 #private-functions
 def csv_ticker_to_pd(csv_file):
+    # reads csv_file with pandas
     return pd.read_csv(csv_file, header=None)
 
 def read_ticker(ticker_strs):
+    # creates a dictionary that assigns the str with it's respective ticker
     ticker = {}
     for ticker_str in ticker_strs:
         ticker[ticker_str] = yf.Ticker(ticker_str)
     return ticker
 
-def filter_invalid(monthlies):
-    monthlies2 = {}
-    for e in monthlies:
-        if (len(monthlies[e]) != 0):
-            monthlies2[e] = monthlies[e]
-    return monthlies2
+def filter_invalid(data):
+    # removes elements that have 0 length (i.e. unlisted stocks)
+    data2 = {}
+    for e in data:
+        if (len(data[e]) != 0):
+            data2[e] = data[e]
+        else:
+            print('removed',e,'; no data')
+    return data2
 
 def get_vols(tickers,start,end,interval):
+    # gets the volume given a ticker dictionary
     closes = {}
     for e in tickers:
         closes[e] = (tickers[e].history(start=start,end=end,interval=interval).Volume)
     return closes
 
 def get_days_in_month(year, month):
+    # calculates the days in a year
     days_in_month = [31,28,31,30,31,30,31,31,30,31,30,31]
-    if (year % 4 == 0 and month == 2):
+    if (year % 4 == 0 and month == 2): # leap year
         return 29
     return days_in_month[month]
 
+def get_inactive_days(df, year, month): 
+    # function that gets the days in a month
+    start = '{}-{}-{}'.format(year,month,'01')
+    end = '{}-{}-{}'.format(year,month+1,'01')
+    return get_days_in_month(year,month)-len(df.loc[start:end])
+
+def purge_inactive_months(daily, monthly):
+    # removes months that have more than 18 inactive days
+    monthly2 = pd.DataFrame()
+    for date in monthly.index:
+        inactive_days = get_inactive_days(daily, date.year, date.month)
+        if (inactive_days < 18): # keep months that have less than 18 inactive days
+            monthly2.at[date, 'Close'] = monthly[date]
+    return monthly2
+
 def filter_volume(monthlies, dailies):
+    # removes monthly data that do not have enough volume
     monthlies2 = {}
     for e in monthlies:
+        if (not (e in dailies.keys())): continue # if daily data does not exist for some reason
+        
         monthly_vol = purge_inactive_months(monthlies[e], dailies[e])
-        if (np.average(monthly_vol) >= 150000):
+        average = np.average(monthly_vol)
+        if (average >= 150000): # keep stock if average is at least 150000
             monthlies2[e] = monthlies[e]
+        else:
+            print('removed',e,'; not enough average volume: ',average)
     return monthlies2
 
 filtering_start_date = '2023-01-01'
@@ -51,13 +79,14 @@ max_inactive_days = 18
 #=========================
 # public function
 # returns a list of tickers, inputs csv_file
-def filter_tickers_from_csv(csv_file):
-  tickers = read_ticker(csv_ticker_to_pd(csv_file))
-
-  monthlies = filter_invalid(get_vols(tickers,filtering_start_date,fltering_end_date,'1mo'))
-  dailies = filter_invalid(get_vols(tickers,filtering_start_date,fltering_end_date,'1d'))
-  monthlies = filter_volume(dailies,monthlies)
-  return monthlies.keys()
+def get_valid_tickers(filename):
+    ticker_df = csv_ticker_to_pd(filename) # dataframe with one column (tickers)
+    tickers_lst = ticker_df[0].tolist() # list of tickers
+    tickers = read_ticker(tickers_lst) # dictionary (ticker str : ticker object)
+    monthlies = filter_invalid(get_vols(tickers,filtering_start_date,fltering_end_date,'1mo'))
+    dailies = filter_invalid(get_vols(tickers,filtering_start_date,fltering_end_date,'1d'))
+    monthlies = filter_volume(dailies,monthlies) # filter by volumes
+    return list(monthlies.keys())
 
 #=============================================================================
 #public function
@@ -148,5 +177,19 @@ def make_portfolio(dataframe):
     
     return Portfolio_Final
 
+#===========================
 
+#Function that consumes list of tickers and produces a dictionary, where key is the ticker, value is a dataframe of closing prices
 
+def closing_prices(lst_tickers):
+    start_date = '2021-10-20'
+    end_date = '2023-11-20'
+    i = 0
+    prices_dict={}
+    
+    while i < len(lst_tickers):
+        prices_data = pd.DataFrame(yf.Ticker(lst_tickers[i]).history(start=start_date, end=end_date, interval='1mo').Close)
+        prices_dict[lst_tickers[i]] = prices_data
+        i += 1
+    
+    return prices_dict
