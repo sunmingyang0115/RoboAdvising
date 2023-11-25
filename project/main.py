@@ -188,13 +188,16 @@ def calc_std(close):
 def relativize(close):
     return close/close.iloc[0] # makes the close relative to the initial price
 
+
+
+# METHOD 1
 def CalcTop10Sharpe(close_df, p):
     # creates a column with values being the correlation between the anchor 'p' against rest of portfolio
-    close_df['Corr'] = close_df['Close'].apply(lambda x : correlation(x.Close.pct_change().dropna(), p))
+    close_df['Corr'] = close_df['Close'].apply(lambda x : correlation(x.Close.pct_change().dropna(), p.Close.pct_change()))
     
     #sort the portfolio and get the head(10)
     sorted_close = close_df.sort_values('Corr', ascending=False).head(10)
-
+    
     # sums up the portfolios based on our weighting procedure
     close_column = pd.DataFrame()
     i = 0
@@ -209,6 +212,28 @@ def CalcTop10Sharpe(close_df, p):
     return sorted_close['Ticker'].tolist(), calc_modified_sharpe(close_column['Sum'].pct_change().dropna())
 
 
+
+# METHOD 2
+def CalcTop10Sharpe2(close_df, p):
+    # creates a column with values being the correlation between the anchor 'p' against rest of portfolio
+    close_df['Corr'] = close_df['Close'].apply(lambda x : calc_modified_sharpe(x.Close.pct_change().dropna() + p.Close.pct_change()))
+    #sort the portfolio and get the head(10)
+    sorted_close = close_df.sort_values('Corr', ascending=False).head(10)
+    # sums up the portfolios based on our weighting procedure
+    corr_sum = 0
+    
+    for obj1 in sorted_close['Close']:
+        for obj2 in sorted_close['Close']:
+            corr_sum += correlation(obj1.Close.pct_change().dropna(), obj2.Close.pct_change().dropna())
+            
+    #returns the top10 tickers and the sharpe ratio
+    return sorted_close['Ticker'].tolist(), corr_sum
+
+
+
+
+
+
 def CalcTop10Tickers(dict_prices): #dict_prices 
     top10 = []
     sharpe = 0
@@ -218,7 +243,7 @@ def CalcTop10Tickers(dict_prices): #dict_prices
 
     for e in dict_prices:
         p = dict_prices[e]     # choose p is the 'anchor'
-        ntop10, nsharpe = CalcTop10Sharpe(close_df, p)
+        ntop10, nsharpe = CalcTop10Sharpe2(close_df, p)
         if (nsharpe > sharpe): # choose the best combination of 'p'
             top10 = ntop10
             sharpe = nsharpe
@@ -235,7 +260,7 @@ def weighter(ticker): # takes a ticker lst and turns into a dataframe with ticke
     df = pd.DataFrame()
     df['tickers']=ticker 
     df['Weight']=weights
-    return (df.set_index('tickers'))
+    return df.set_index('tickers')
 
 #=============================================================================
 # public function
@@ -298,13 +323,22 @@ def make_stocks_final(portfolio, filename):
     return Stocks_Final.to_csv(filename)
 
 
-#=============END OF PORTFOLIO=========
+#=============END OF PORTFOLI=========
 #==================================
 
 
-lst_tickers = get_valid_tickers('Tickers_Example.csv')
-dict_prices = closing_prices(lst_tickers)
-top10 = CalcTop10Tickers(dict_prices)
-Portfolio_Final = make_portfolio(weighter(top10))
+lst_tickers = get_valid_tickers('Tickers_Example.csv') # lst with only valid tickers
+dict_prices = closing_prices(lst_tickers) # dictionary of ticker to close
+
+
+top10 = CalcTop10Tickers(dict_prices) # gets the top 10 portfolio
+
+
+Portfolio_Final = make_portfolio(weighter(top10)) # final portfolio
+
+
 print('Total Weight of the portfolio: ', Portfolio_Final.Weight.sum(), sep='')
 print('Total Value of the portfolio: $', Portfolio_Final.Value.sum() + flat_fee*len(Portfolio_Final), sep='')
+
+
+Portfolio_Final
