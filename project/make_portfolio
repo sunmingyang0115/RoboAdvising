@@ -1,4 +1,5 @@
 #Function to produce dataframe portfolio, consumes a dataframe that has tickers as index and stores their chosen weights in a column labelled 'Weight'
+
 def make_portfolio(dataframe):
     #Define Variables
     money = 750000
@@ -40,10 +41,13 @@ def make_portfolio(dataframe):
     Portfolio_Final['Shares'] = num_shares_lst
     Portfolio_Final['Value'] = value_lst
     Portfolio_Final['Weight'] = weight_lst
-    Portfolio_Final['Total Weight'] = Portfolio_Final.Weight.sum()
-    Portfolio_Final['Total Value'] = Portfolio_Final.Value.sum() + flat_fee*len(dataframe)
     
     #Change index of portfolio
     Portfolio_Final.set_index(pd.Series(index_lst), inplace = True)
     
     return Portfolio_Final
+    
+Portfolio_Final = make_portfolio(betas)
+print('Total Weight of the portfolio: ', Portfolio_Final.Weight.sum(), sep='')
+print('Total Value of the portfolio: $', Portfolio_Final.Value.sum() + flat_fee*len(Portfolio_Final), sep='')
+Portfolio_Final
