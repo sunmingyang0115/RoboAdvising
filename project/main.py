@@ -7,7 +7,8 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 from datetime import datetime
 
-#========================
+##======================================================
+#======================== START OF FILTERING
 #private-functions
 def csv_ticker_to_pd(csv_file):
     # reads csv_file with pandas
@@ -76,7 +77,9 @@ def filter_volume(monthlies, dailies):
 def filter_currency(tickers):
     tickers2 = {}
     for e in tickers:
+        # do not add if currency not specified
         if (not ('currency' in tickers[e].info)): continue
+        # keep only if CAD if USD currency
         if (tickers[e].info['currency'] == 'USD' or tickers[e].info['currency'] == 'CAD'):
             tickers2[e] = tickers[e]
     return tickers2
@@ -97,30 +100,48 @@ def get_valid_tickers(filename):
     monthlies = filter_volume(dailies,monthlies) # filter by volumes
     return list(monthlies.keys())
 
-#=============================================================================
-#public function
+#======== END OF FILTERING
+#===========================
 
-#Function that calculates correlation given two stocks (strings), produces a dataframe with correlation values
-def correlation(stock1, stock2):
-    #Create portfolio of monthly returns 
-    start_date = '2021-10-20'
-    end_date = '2023-11-20'
-    stock1_hist = yf.Ticker(stock1).history(start=start_date, end=end_date, interval='1mo')
-    stock2_hist = yf.Ticker(stock2).history(start=start_date, end=end_date, interval='1mo')
+
+
+
+#=========== START OF DATA IMPORT===============
+#================================================
+
+start_date = '2021-10-20'
+end_date = '2023-11-20'
     
-    #Create DataFrame
-    prices = pd.DataFrame(stock1_hist.Close)
-    prices.columns = [stock1]
-    prices[stock2] = stock2_hist.Close
-    returns = prices.pct_change()
-    #Drop NaN values
-    returns.drop(index=returns.index[0], inplace=True)
+# Create dataframe of exchange rates
+exchange_rates = pd.DataFrame(yf.Ticker('CADUSD=x').history(start=start_date, end=end_date, interval='1mo'))
+exchange_rates_df = pd.DataFrame(exchange_rates.Close)
+exchange_rates_df.index = exchange_rates_df.index.strftime('%Y-%m-%d')
+
+#Function that consumes list of tickers, produces a dictionary, where key is the ticker, value is a dataframe of only closing prices
+def closing_prices(lst_tickers):
+    i = 0
+    prices_dict={}
     
-    #Calculate correlation between two stocks   
-    return returns.corr()
+    # While loop to fill up dictionary
+    while i < len(lst_tickers):
+        close_prices = pd.DataFrame(yf.Ticker(lst_tickers[i]).history(start=start_date, end=end_date, interval='1mo').Close)
+        close_prices.index = close_prices.index.strftime('%Y-%m-%d')
+        
+        # Convert historical prices to CAD if currency is in USD
+        if yf.Ticker(lst_tickers[i]).fast_info['currency'] == 'USD':
+            prices_data = pd.DataFrame(close_prices/exchange_rates_df).dropna()
+            
+            # Assign dictionary key and value
+            prices_dict[lst_tickers[i]] = prices_data
+        else:
+            prices_data = pd.DataFrame(close_prices).dropna()
+            
+            # Assign dictionary key and value
+            prices_dict[lst_tickers[i]] = prices_data
+        i += 1
     
-#=============================================================================
-# public function
+    return prices_dict
+#==============
 
 # Globally defined variable, to be used in multiple functions
 closing_date = '2023-11-20'
@@ -131,24 +152,99 @@ def USD_to_CAD_converter(usd_price):
     cad_price = usd_price/exchange_rate
     return cad_price
 
-USD_to_CAD_converter(12)
 
-#==========
+#===========END OF DATA IMPORT====================
+#================================================
 
-def weighter(ticker):
+
+#=========START OF STATS==================
+#=========================================
+
+weights = [0.20,0.20,0.20,0.10,0.05,0.05,0.05,0.05,0.05,0.05]
+
+#Function that calculates covariance given two stocks (strings), produces a dataframe with correlation values
+def correlation(stock1_hist, stock2_hist):
+    
+    #Create DataFrame
+    prices = pd.DataFrame(stock1_hist)
+    prices.columns = ['stock1']
+    prices['stock2'] = stock2_hist
+    
+    #Drop NaN values
+    returns = prices.pct_change().dropna()
+    
+    #Calculate correlation between two stocks   
+    return returns.corr()['stock2']['stock1']
+
+def calc_modified_sharpe(close):
+    return abs(calc_mean(close))*calc_std(close) # modified sharpe ratio = |mean|/std
+
+def calc_mean(close):
+    return close.mean()
+    
+def calc_std(close):
+    return close.std()
+
+def relativize(close):
+    return close/close.iloc[0] # makes the close relative to the initial price
+
+def CalcTop10Sharpe(close_df, p):
+    # creates a column with values being the correlation between the anchor 'p' against rest of portfolio
+    close_df['Corr'] = close_df['Close'].apply(lambda x : correlation(x.Close.pct_change().dropna(), p))
+    
+    #sort the portfolio and get the head(10)
+    sorted_close = close_df.sort_values('Corr', ascending=False).head(10)
+
+    # sums up the portfolios based on our weighting procedure
+    close_column = pd.DataFrame()
+    i = 0
+    for obj in sorted_close['Close']:
+        if (not('Sum' in close_column.columns)):
+            close_column['Sum'] = relativize(obj.Close) * weights[i]
+        else:
+            close_column['Sum'] += relativize(obj.Close) * weights[i]
+        i+=1
+            
+            #returns the top10 tickers and the sharpe ratio
+    return sorted_close['Ticker'].tolist(), calc_modified_sharpe(close_column['Sum'].pct_change().dropna())
+
+
+def CalcTop10Tickers(dict_prices): #dict_prices 
+    top10 = []
+    sharpe = 0
+
+    # dataframe with ticker and close
+    close_df = pd.DataFrame(dict_prices.items(), columns=['Ticker', 'Close'])
+
+    for e in dict_prices:
+        p = dict_prices[e]     # choose p is the 'anchor'
+        ntop10, nsharpe = CalcTop10Sharpe(close_df, p)
+        if (nsharpe > sharpe): # choose the best combination of 'p'
+            top10 = ntop10
+            sharpe = nsharpe
+    return top10
+
+#===========END OF STATS=============
+#=================================
+
+
+
+#==========START OF PORTFOLI0===========
+#==================================
+def weighter(ticker): # takes a ticker lst and turns into a dataframe with ticker as index and weight as value
     df = pd.DataFrame()
-    df['tickers']=ticker
-    df['Weight']=[0.20,0.20,0.20,0.10,0.05,0.05,0.05,0.05,0.05,0.05]
+    df['tickers']=ticker 
+    df['Weight']=weights
     return (df.set_index('tickers'))
 
 #=============================================================================
 # public function
-
 #Function to produce dataframe portfolio, consumes a dataframe that has tickers as index and stores their chosen weights in a column labelled 'Weight'
+flat_fee = 4.95
+
 def make_portfolio(dataframe):
     #Define Variables
     money = 750000
-    flat_fee = 4.95
     i = 0
     
     # Create Empty DataFrame and lists
@@ -186,36 +282,29 @@ def make_portfolio(dataframe):
     Portfolio_Final['Shares'] = num_shares_lst
     Portfolio_Final['Value'] = value_lst
     Portfolio_Final['Weight'] = weight_lst
-    Portfolio_Final['Total Weight'] = Portfolio_Final.Weight.sum()
-    Portfolio_Final['Total Value'] = Portfolio_Final.Value.sum() + flat_fee*len(dataframe)
     
     #Change index of portfolio
     Portfolio_Final.set_index(pd.Series(index_lst), inplace = True)
     
     return Portfolio_Final
-#======
+
+#==========
+
 
 def make_stocks_final(portfolio, filename):
     Stocks_Final = portfolio
-    Stocks_Final.drop(columns=['Price', 'Currency', 'Value', 'Weight', 'Total Weight', 'Total Value'], inplace=True)
+    Stocks_Final.drop(columns=['Price', 'Currency', 'Value', 'Weight'], inplace=True)
     
-    return Stocks_Final.to_csv(filename+'.csv')
-
-#===========================
+    return Stocks_Final.to_csv(filename)
 
 
+#=============END OF PORTFOLIO=========
+#==================================
 
-#Function that consumes list of tickers and produces a dictionary, where key is the ticker, value is a dataframe of closing prices
 
-def closing_prices(lst_tickers):
-    start_date = '2021-10-20'
-    end_date = '2023-11-20'
-    i = 0
-    prices_dict={}
-    
-    while i < len(lst_tickers):
-        prices_data = pd.DataFrame(yf.Ticker(lst_tickers[i]).history(start=start_date, end=end_date, interval='1mo').Close)
-        prices_dict[lst_tickers[i]] = prices_data
-        i += 1
-    
-    return prices_dict
+lst_tickers = get_valid_tickers('Tickers_Example.csv')
+dict_prices = closing_prices(lst_tickers)
+top10 = CalcTop10Tickers(dict_prices)
+Portfolio_Final = make_portfolio(weighter(top10))
+print('Total Weight of the portfolio: ', Portfolio_Final.Weight.sum(), sep='')
+print('Total Value of the portfolio: $', Portfolio_Final.Value.sum() + flat_fee*len(Portfolio_Final), sep='')
