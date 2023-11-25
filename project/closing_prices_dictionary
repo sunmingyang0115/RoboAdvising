@@ -1,4 +1,9 @@
-#Function that consumes list of tickers and produces a dictionary, where key is the ticker, value is a dataframe of closing prices
+# Create dataframe of exchange rates
+exchange_rates = pd.DataFrame(yf.Ticker('CADUSD=x').history(start=start_date, end=end_date, interval='1mo'))
+exchange_rates_df = pd.DataFrame(exchange_rates.Close)
+exchange_rates_df.index = exchange_rates_df.index.strftime('%Y-%m-%d')
+
+#Function that consumes list of tickers, produces a dictionary, where key is the ticker, value is a dataframe of only closing prices
 
 def closing_prices(lst_tickers):
     start_date = '2021-10-20'
@@ -7,8 +12,17 @@ def closing_prices(lst_tickers):
     prices_dict={}
     
     while i < len(lst_tickers):
-        prices_data = pd.DataFrame(yf.Ticker(lst_tickers[i]).history(start=start_date, end=end_date, interval='1mo').Close)
-        prices_dict[lst_tickers[i]] = prices_data
+        close_prices = pd.DataFrame(yf.Ticker(lst_tickers[i]).history(start=start_date, end=end_date, interval='1mo').Close)
+        close_prices.index = close_prices.index.strftime('%Y-%m-%d')
+        
+        if yf.Ticker(lst_tickers[i]).fast_info['currency'] == 'USD':
+            prices_data = pd.DataFrame(close_prices/exchange_rates_df)
+            prices_dict[lst_tickers[i]] = prices_data
+        else:
+            prices_data = pd.DataFrame(close_prices)
+            prices_dict[lst_tickers[i]] = prices_data
         i += 1
     
     return prices_dict
+    
+closing_prices(['AAPL', 'SHOP.TO', 'VGZ'])
