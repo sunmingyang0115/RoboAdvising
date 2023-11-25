@@ -1,6 +1,6 @@
 def make_stocks_final(portfolio):
     Stocks_Final = portfolio
-    Stocks_Final.drop(columns=['Price', 'Currency', 'Value', 'Weight', 'Total Weight', 'Total Value'], inplace=True)
+    Stocks_Final.drop(columns=['Price', 'Currency', 'Value', 'Weight'], inplace=True)
     
     return Stocks_Final
 
